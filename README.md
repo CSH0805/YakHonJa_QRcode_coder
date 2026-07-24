@@ -4,10 +4,12 @@
 
 ## 기술 스택
 - Node.js + Express
-- MySQL 8.x (서버에 직접 설치, `mysql2/promise` 커넥션 풀)
+- MySQL 8.x — **AWS RDS for MySQL** (`mysql2/promise` 커넥션 풀, SSL 필수)
 - QR 생성: `qrcode`
 - 만료 토큰 정리: `node-cron`
 - 프론트: 정적 HTML + fetch (등록 폼), 서버 렌더 HTML (QR 랜딩 페이지)
+
+> ⚠️ **보안 그룹 TODO**: 현재 RDS 인스턴스의 보안 그룹이 `0.0.0.0/0`(전체 인터넷)에 3306 포트를 열어두고 있습니다. 이 문서의 설정(SSL 필수, 최소 권한 계정)은 전송 구간과 계정 권한을 보호할 뿐 "누구나 3306으로 접속을 시도할 수 있다"는 점 자체는 막지 못합니다. **운영/시연 전에 반드시** 보안 그룹 인바운드 규칙을 EC2(앱 서버) 보안 그룹 또는 특정 IP 대역으로 제한하세요.
 
 ## 데이터 모델
 
@@ -25,54 +27,60 @@
 
 ---
 
-## 1. MySQL 설치 및 초기 설정
+## 1. AWS RDS(MySQL) 연결 및 초기 설정
 
-### 1-1. 설치 (Ubuntu/Debian 기준)
+### 1-1. RDS 인스턴스 준비
 
-```bash
-sudo apt update
-sudo apt install -y mysql-server
-sudo systemctl enable --now mysql
-sudo mysql_secure_installation
-```
+RDS 콘솔에서 MySQL 8.x 인스턴스를 생성(또는 이미 생성된 인스턴스 사용)합니다. 퍼블릭 액세스가 필요하면(EC2 없이 로컬에서 직접 접속하는 경우) 인스턴스 생성 시 "퍼블릭 액세스 가능"을 예로 설정하세요. 엔드포인트/포트는 RDS 콘솔 > 데이터베이스 > 연결 & 보안 탭에서 확인합니다.
 
-`mysql_secure_installation` 진행 시 root 비밀번호 설정, 익명 사용자 제거, 원격 root 로그인 비활성화, 테스트 DB 제거를 모두 예(Y)로 진행하세요.
+### 1-2. RDS CA 번들 다운로드 (SSL 필수)
 
-### 1-2. 외부 접속 차단
-
-`/etc/mysql/mysql.conf.d/mysqld.cnf` (또는 배포판에 따라 `/etc/mysql/my.cnf`)에서:
-
-```ini
-[mysqld]
-bind-address = 127.0.0.1
-```
-
-방화벽에서도 3306 포트를 외부에 열지 않습니다.
+이 프로젝트는 RDS 접속 시 서버 인증서를 실제로 검증합니다(`rejectUnauthorized: false` 사용 안 함). 리전에 맞는 CA 번들을 받아 `certs/`에 둡니다.
 
 ```bash
-sudo ufw deny 3306
-sudo systemctl restart mysql
+mkdir -p certs
+curl -o certs/ap-northeast-2-bundle.pem \
+  https://truststore.pki.rds.amazonaws.com/ap-northeast-2/ap-northeast-2-bundle.pem
 ```
+
+다른 리전을 쓴다면 `ap-northeast-2` 부분을 해당 리전 코드로 바꾸세요 (전체 목록: [AWS RDS SSL 문서](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.SSL.html)).
 
 ### 1-3. DB / 테이블 / 애플리케이션 계정 생성
 
-`schema.sql`은 DB, 테이블, 인덱스, 그리고 앱 전용 계정(`yaksok_app`)까지 한 번에 생성합니다. **root는 이 스크립트를 실행할 때만 사용**하고, 애플리케이션은 절대 root로 접속하지 않습니다.
+`schema.sql`은 DB, 테이블, 인덱스, 그리고 앱 전용 계정(`yaksok_app`)까지 한 번에 생성합니다. **RDS 마스터(admin) 계정은 이 스크립트를 실행할 때만 사용**하고, 애플리케이션은 절대 admin으로 접속하지 않습니다.
 
 ```bash
-mysql -u root -p < schema.sql
+mysql -h <RDS 엔드포인트> -u admin -p \
+  --ssl-ca=certs/ap-northeast-2-bundle.pem --ssl-mode=VERIFY_IDENTITY \
+  < schema.sql
 ```
 
-> `schema.sql`에는 `yaksok_app` 계정 비밀번호가 예시값(`change_me_strong_password`)으로 들어 있습니다. 실행 전에 강력한 값으로 바꾸고, 바꾼 값을 `.env`의 `DB_PASSWORD`에도 동일하게 넣어주세요.
+> `schema.sql`에는 `yaksok_app` 계정 비밀번호가 예시값(`change_me_strong_password`)으로 들어 있습니다. 실행 전(또는 실행 직후)에 강력한 값으로 바꾸고, 바꾼 값을 `.env`의 `DB_PASSWORD`에도 동일하게 넣어주세요.
 >
 > ```sql
-> ALTER USER 'yaksok_app'@'localhost' IDENTIFIED BY '실제_비밀번호';
+> ALTER USER 'yaksok_app'@'%' IDENTIFIED BY '실제_비밀번호';
+> FLUSH PRIVILEGES;
 > ```
+>
+> 이미 같은 RDS 인스턴스에 다른 팀(예: 앱 백엔드)의 테이블이 있을 수 있습니다. `schema.sql`의 `GRANT`는 의도적으로 `yaksok.*` 전체가 아니라 이 서비스가 쓰는 테이블 3개(`prescriptions`, `prescription_items`, `access_tokens`)에만 좁혀서 권한을 줍니다 — 다른 팀 테이블에 실수로 접근하지 않도록 하기 위함이니 이 스코프를 넓히지 마세요.
 
 생성된 계정 확인:
 
 ```bash
-mysql -u yaksok_app -p -h 127.0.0.1 yaksok_qr -e "SHOW TABLES;"
+mysql -h <RDS 엔드포인트> -u yaksok_app -p \
+  --ssl-ca=certs/ap-northeast-2-bundle.pem --ssl-mode=VERIFY_IDENTITY \
+  yaksok -e "SHOW TABLES;"
 ```
+
+### 1-4. SSL 연결 확인
+
+```bash
+mysql -h <RDS 엔드포인트> -u yaksok_app -p \
+  --ssl-ca=certs/ap-northeast-2-bundle.pem --ssl-mode=VERIFY_IDENTITY \
+  -e "SHOW STATUS LIKE 'Ssl_cipher';"
+```
+
+`Ssl_cipher` 값이 비어 있지 않아야(예: `TLS_AES_256_GCM_SHA384`) 실제로 암호화된 연결입니다.
 
 ---
 
@@ -81,7 +89,8 @@ mysql -u yaksok_app -p -h 127.0.0.1 yaksok_qr -e "SHOW TABLES;"
 ```bash
 npm install
 cp .env.example .env
-# .env를 열어 DB_PASSWORD 등을 schema.sql에서 설정한 값과 맞춰주세요.
+# .env를 열어 DB_HOST/DB_USER/DB_PASSWORD를 RDS 접속정보와 schema.sql에서 만든 계정으로 맞춰주세요.
+# DB_SSL은 기본 true이며, certs/ap-northeast-2-bundle.pem이 있어야 부팅됩니다 (1-2번 참고).
 # ADMIN_API_KEY도 반드시 채워야 서버가 부팅됩니다 (비어 있으면 즉시 에러 종료).
 #   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 npm run dev
@@ -152,6 +161,8 @@ curl -I https://qr.yaksok.kr/.well-known/assetlinks.json
 
 ### 3-4. 백업
 
+**RDS 자동 백업(스냅샷)이 있다면 그것이 1차 복구 수단**이며, `scripts/backup.sh`는 특정 시점 SQL 덤프를 별도로 뽑아두기 위한 보조 수단입니다. RDS 콘솔 > 유지 관리 및 백업에서 자동 백업 활성화 여부와 보존 기간을 확인하세요.
+
 ```bash
 sudo mkdir -p /var/backups/yaksok-qr
 chmod +x scripts/backup.sh
@@ -159,6 +170,8 @@ crontab -e
 # 매일 새벽 3시 백업
 # 0 3 * * * /path/to/project/scripts/backup.sh >> /var/log/yaksok-backup.log 2>&1
 ```
+
+비밀번호는 `--defaults-extra-file`(0600 권한의 임시 파일, 실행 후 자동 삭제)로 `mysqldump`에 전달되어 `ps`로 노출되지 않습니다. `yaksok_app` 계정은 RDS가 요구하는 `RELOAD`/`PROCESS` 같은 관리자 권한이 없으므로(의도적으로 최소 권한만 부여) `--set-gtid-purged=OFF --no-tablespaces` 옵션으로 `mysqldump`가 그런 권한을 요구하는 경로를 타지 않게 했습니다.
 
 ---
 
@@ -222,4 +235,5 @@ crontab -e
 - 모든 SQL은 `mysql2` placeholder 바인딩 사용 (문자열 연결 금지)
 - 에러 응답에 스택 트레이스/SQL 등 내부 정보 미노출
 - 토큰 만료는 DB 서버 타임존과 무관하게 Node가 계산 (위 "타임존" 섹션 참고), `node-cron`으로 1시간마다 만료 토큰 삭제
-- MySQL은 `127.0.0.1`에만 바인딩, 3306 포트 방화벽 차단, 애플리케이션 전용 계정만 사용 (root 미사용)
+- DB는 RDS 접속 시 SSL 필수(`rejectUnauthorized: false` 사용 안 함, CA 번들로 서버 인증서 실제 검증), 애플리케이션 전용 계정(`yaksok_app`)만 사용하며 이 서비스가 쓰는 테이블 3개로만 권한을 좁힘 (admin/root 미사용)
+- **TODO(운영 전 필수)**: RDS 보안 그룹이 현재 `0.0.0.0/0`으로 열려 있음 — 위 "기술 스택" 섹션의 경고 참고, EC2/특정 IP로 제한할 것

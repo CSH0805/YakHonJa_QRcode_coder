@@ -15,6 +15,9 @@ module.exports = {
     user: required('DB_USER'),
     password: required('DB_PASSWORD'),
     database: required('DB_NAME'),
+    // 기본값 true: RDS 등 네트워크를 경유하는 접속은 SSL이 기본이어야 한다.
+    // 명시적으로 "false"를 넣은 경우에만(예: 로컬 127.0.0.1) 끈다.
+    ssl: process.env.DB_SSL !== 'false',
   },
   port: Number(process.env.PORT || 3000),
   baseUrl: required('BASE_URL').replace(/\/+$/, ''),
