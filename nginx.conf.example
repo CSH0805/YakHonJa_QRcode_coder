@@ -1,4 +1,7 @@
-# /etc/nginx/sites-available/qr.yaksok.kr
+# 직접 서버(EC2 등)에 배포할 때만 사용하는 예시 설정입니다.
+# Render 배포 시에는 Render가 HTTPS 종료와 리버스 프록시를 처리하므로 이 파일이 필요 없습니다.
+#
+# /etc/nginx/sites-available/qr.yaksok.kr  (아래 도메인은 예시이며 실제 배포 도메인으로 바꿔서 쓰세요)
 #
 # 적용 순서:
 #   1) 아래 파일 내용 그대로 저장 후:

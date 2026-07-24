@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "YakSok medicine QR web/server (registration API + QR issuance + app session/lookup API)",
   "main": "src/server.js",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js"

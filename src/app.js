@@ -3,10 +3,15 @@ const express = require('express');
 
 const noStore = require('./middleware/noStore');
 const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
+const { healthz } = require('./controllers/healthController');
 const apiRouter = require('./routes/api');
 const webRouter = require('./routes/web');
 
 const app = express();
+
+// Render 등 리버스 프록시 뒤에서 실행되므로 X-Forwarded-For의 첫 번째 홉만 신뢰한다.
+// true를 쓰면 클라이언트가 X-Forwarded-For를 위조해 IP 기반 rate limit을 우회할 수 있어 금지.
+app.set('trust proxy', 1);
 
 const WELL_KNOWN_DIR = path.join(__dirname, '..', 'public', '.well-known');
 
@@ -27,6 +32,10 @@ app.get('/.well-known/assetlinks.json', (req, res) => {
 });
 
 app.use(noStore);
+
+// Render 헬스체크 + 콜드 스타트 이후 서비스를 깨우는 용도. 인증 불필요, rate limit 미적용.
+// DB까지 SELECT 1로 확인하므로 DB 연결이 끊긴 상태면 503을 반환한다.
+app.get('/healthz', healthz);
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
 

@@ -14,6 +14,8 @@ YakSok 앱 개발자를 위한 문서입니다. 이 문서만 보고 QR 스캔 �
 > | 조회 응답 구조 | 약 1개의 필드가 최상위에 바로 있음 | `medicines` 배열로 감싸짐 (아래 3번 참고) |
 >
 > 이미 이전 경로/응답 구조로 작업을 시작했다면 반드시 아래 내용으로 갱신해주세요.
+>
+> **도메인도 변경되었습니다**: `qr.yaksok.kr` → `yaksok-qr.onrender.com` (아래 전체가 새 도메인 기준으로 갱신됨).
 
 ---
 
@@ -21,7 +23,7 @@ YakSok 앱 개발자를 위한 문서입니다. 이 문서만 보고 QR 스캔 �
 
 ```
 1. 환자가 QR 스캔
-2. 앱이 https://qr.yaksok.kr/prescription/{qrId} 형태의 URL을 받음 (App Link / Universal Link로 앱이 직접 실행됨)
+2. 앱이 https://yaksok-qr.onrender.com/prescription/{qrId} 형태의 URL을 받음 (App Link / Universal Link로 앱이 직접 실행됨)
 3. 앱이 qrId를 추출해 세션 발급 API 호출 → access_token 획득 (3시간 유효)
 4. 앱이 access_token으로 조회 API 호출 → 처방전 전체(공통 일정 + 약 목록) 획득
 5. 앱이 로컬 복약 일정에 처방전 내 약들을 등록
@@ -33,7 +35,7 @@ QR 자체는 만료되지 않습니다. 만료되는 건 access_token뿐이며, 
 ## 2. QR URL 형식
 
 ```
-https://qr.yaksok.kr/prescription/{qrId}
+https://yaksok-qr.onrender.com/prescription/{qrId}
 ```
 
 - `qrId`는 64자 hex 문자열이며 그 자체로 추측 불가능한 식별자입니다. URL에 별도 토큰 쿼리 파라미터는 없습니다.
@@ -144,9 +146,16 @@ Authorization: Bearer {access_token}
 
 ## 7. App Links / Universal Links 설정을 위해 서버 팀에 전달할 값
 
-서버는 `https://qr.yaksok.kr/.well-known/assetlinks.json`, `.../apple-app-site-association`을 정적으로 서빙할 준비가 되어 있지만, 아래 값은 플레이스홀더 상태입니다. 앱 팀에서 값을 전달해주셔야 실제 배포가 가능합니다.
+서버는 `https://yaksok-qr.onrender.com/.well-known/assetlinks.json`, `.../apple-app-site-association`을 정적으로 서빙할 준비가 되어 있지만, 아래 값은 플레이스홀더 상태입니다. 앱 팀에서 값을 전달해주셔야 실제 배포가 가능합니다.
 
 - **Android**: 패키지명(`applicationId`), 릴리스 키스토어의 SHA-256 서명 지문
 - **iOS**: Apple Developer Team ID, Bundle ID
 
 두 파일 모두 `paths`에 `/prescription/*` 하나만 등록되어 있으니, 다른 경로도 앱에서 열어야 한다면 별도로 알려주세요.
+
+## 8. 콜드 스타트 대응 (중요)
+
+서버가 Render 무료 티어에 배포되어 있습니다. **15분간 요청이 없으면 서비스가 중지되고, 다음 요청이 왔을 때 다시 뜨는 데 50초 이상 걸릴 수 있습니다.** 세션 발급/조회 API가 평소보다 오래 걸린다고 해서 실패로 간주하지 마세요.
+
+- **API 호출 타임아웃을 최소 60초로 설정하세요.** 기본값(보통 10~30초)으로 두면 콜드 스타트 중 정상 요청이 타임아웃으로 실패합니다.
+- `GET /healthz`로 미리 깨워둘 수 있습니다 (인증 불필요, DB 연결까지 확인 후 `{"status":"ok"}` 반환). 시연/테스트 직전에 한 번 호출해두는 것을 권장합니다.

@@ -108,13 +108,30 @@ API 테스트는 [docs/curl-examples.md](docs/curl-examples.md) 참고.
 
 ## 3. 서버 배포
 
-### 3-1. 코드 배포 + 프로세스 관리 (PM2)
+### 3-1. Render (현재 배포 방식)
+
+**현재 운영 중인 배포**: https://yaksok-qr.onrender.com (Live, RDS 연결 확인됨)
+
+Render는 리버스 프록시 뒤에서 앱을 실행하고 `PORT` 환경변수를 직접 주입합니다. 이미 반영되어 있습니다 (`src/app.js`의 `app.set('trust proxy', 1)`, `src/server.js`의 `app.listen(env.port, '0.0.0.0', ...)`).
+
+Render 대시보드 설정:
+- **Build Command**: `npm install`
+- **Start Command**: `npm start` (또는 `node src/server.js`)
+- **Environment**: `.env.example`의 키를 전부 등록 (`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_SSL=true`, `BASE_URL=https://yaksok-qr.onrender.com`, `ADMIN_API_KEY`, `NODE_ENV=production`). `PORT`는 Render가 자동 주입하므로 직접 설정하지 않습니다.
+- **Health Check Path**: `/healthz` (아래 5-1번 참고) — Settings → Health Check Path에 등록하세요.
+- `certs/ap-northeast-2-bundle.pem`은 저장소에 포함되어 있어 별도 업로드 없이 빌드됩니다.
+
+배포 갱신은 `git push`로 연결된 브랜치에 반영하면 Render가 자동으로 재빌드/재배포합니다.
+
+### 3-2. EC2 등 직접 서버에 배포하는 경우 (대안)
+
+> Render를 쓰면 이 섹션은 필요 없습니다. EC2 등 직접 관리하는 서버에 배포할 때만 참고하세요.
 
 ```bash
 npm install --production
 npm install -g pm2
 
-cp .env.example .env   # 서버용 값으로 채우기 (BASE_URL=https://qr.yaksok.kr 등)
+cp .env.example .env   # 서버용 값으로 채우기
 
 pm2 start src/server.js --name yaksok-qr
 pm2 save
@@ -129,19 +146,15 @@ npm install --production
 pm2 restart yaksok-qr
 ```
 
-### 3-2. Nginx + Let's Encrypt
-
-[nginx.conf.example](nginx.conf.example) 참고. 요약:
+Nginx + Let's Encrypt는 [nginx.conf.example](nginx.conf.example) 참고 (역시 Render 배포 시에는 불필요 — 파일 상단 안내 참고). 요약:
 
 ```bash
 sudo apt install -y nginx certbot python3-certbot-nginx
-sudo cp nginx.conf.example /etc/nginx/sites-available/qr.yaksok.kr
-sudo ln -s /etc/nginx/sites-available/qr.yaksok.kr /etc/nginx/sites-enabled/
+sudo cp nginx.conf.example /etc/nginx/sites-available/your-domain
+sudo ln -s /etc/nginx/sites-available/your-domain /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
-sudo certbot --nginx -d qr.yaksok.kr
+sudo certbot --nginx -d your-domain
 ```
-
-도메인 `qr.yaksok.kr`은 Android App Links / iOS Universal Links 검증 때문에 고정값입니다. 변경하면 앱 연동이 깨집니다.
 
 ### 3-3. 앱 연동 파일 채우기
 
@@ -153,13 +166,17 @@ sudo certbot --nginx -d qr.yaksok.kr
 두 파일 모두 `src/app.js`에서 확장자 유무와 무관하게 `Content-Type: application/json`으로 명시 응답하며, `Cache-Control: no-store` 미들웨어보다 앞에 위치해 캐싱이 허용됩니다. 배포 후 확인:
 
 ```bash
-curl -I https://qr.yaksok.kr/.well-known/apple-app-site-association
-curl -I https://qr.yaksok.kr/.well-known/assetlinks.json
+curl -I https://yaksok-qr.onrender.com/.well-known/apple-app-site-association
+curl -I https://yaksok-qr.onrender.com/.well-known/assetlinks.json
 ```
 
-`nginx.conf.example`에는 Let's Encrypt ACME 챌린지(`/.well-known/acme-challenge/`)가 이 두 파일의 location과 절대 겹치지 않도록 `^~`/`=` 우선순위를 명시해뒀습니다.
+(EC2 등 직접 배포 시에는) `nginx.conf.example`에 Let's Encrypt ACME 챌린지(`/.well-known/acme-challenge/`)가 이 두 파일의 location과 절대 겹치지 않도록 `^~`/`=` 우선순위를 명시해뒀습니다.
 
-### 3-4. 백업
+### 3-4. 콜드 스타트 대응 (Render 무료 티어)
+
+Render 무료 티어는 15분간 요청이 없으면 서비스가 중지되고, 다음 요청이 왔을 때 다시 뜨는 데 50초 이상 걸릴 수 있습니다. **시연 전에는 `curl https://yaksok-qr.onrender.com/healthz`를 한 번 호출해 서비스를 미리 깨워두세요.** 앱 연동 시 고려사항은 [docs/app-integration.md](docs/app-integration.md)의 안내를 따르세요 (API 타임아웃을 60초 이상으로 설정 권장).
+
+### 3-5. 백업
 
 **RDS 자동 백업(스냅샷)이 있다면 그것이 1차 복구 수단**이며, `scripts/backup.sh`는 특정 시점 SQL 덤프를 별도로 뽑아두기 위한 보조 수단입니다. RDS 콘솔 > 유지 관리 및 백업에서 자동 백업 활성화 여부와 보존 기간을 확인하세요.
 
@@ -185,7 +202,24 @@ crontab -e
 
 ## 5. API 명세 요약
 
-모든 응답은 `Cache-Control: no-store` (단, `.well-known` 앱 연동 파일 2종은 예외 — 3-3번 참고). 에러는 공통으로 `{ "success": false, "error": { "code", "message" } }` 형식.
+### 5-1. 헬스체크
+
+```
+GET /healthz
+```
+
+DB에 `SELECT 1`을 실제로 실행해서 연결까지 확인합니다. 인증 불필요, rate limit 미적용.
+
+| 상태 | 응답 |
+|---|---|
+| 200 | `{ "status": "ok" }` |
+| 503 | `{ "status": "error" }` (DB 연결 실패) |
+
+Render의 헬스체크뿐 아니라, 콜드 스타트 후 서비스를 깨우는 용도로도 씁니다 (3-4번 참고).
+
+### 5-2. 처방전 API
+
+모든 응답은 `Cache-Control: no-store` (단, `.well-known` 앱 연동 파일 2종과 `/healthz`는 예외 — 각각 3-3번, 위 5-1번 참고). 에러는 공통으로 `{ "success": false, "error": { "code", "message" } }` 형식.
 
 | Method | Path | 인증 | 설명 |
 |---|---|---|---|
@@ -234,6 +268,6 @@ crontab -e
 - QR 랜딩 페이지(`/prescription/:qrId`)는 인증 없이 처방 내용을 절대 노출하지 않음 (존재/폐기 여부만 확인)
 - 모든 SQL은 `mysql2` placeholder 바인딩 사용 (문자열 연결 금지)
 - 에러 응답에 스택 트레이스/SQL 등 내부 정보 미노출
-- 토큰 만료는 DB 서버 타임존과 무관하게 Node가 계산 (위 "타임존" 섹션 참고), `node-cron`으로 1시간마다 만료 토큰 삭제
+- 토큰 만료는 DB 서버 타임존과 무관하게 Node가 계산 (위 "타임존" 섹션 참고), `node-cron`으로 1시간마다 만료 토큰 삭제. 단, Render 무료 티어에서 서비스가 콜드 스타트로 중지된 동안에는 이 cron도 돌지 않습니다 — 만료 판정 자체는 조회 시점에 코드에서 항상 수행되므로 보안 문제는 없고, 만료된 레코드가 삭제되지 않고 일시적으로 더 쌓이는 정도의 영향입니다.
 - DB는 RDS 접속 시 SSL 필수(`rejectUnauthorized: false` 사용 안 함, CA 번들로 서버 인증서 실제 검증), 애플리케이션 전용 계정(`yaksok_app`)만 사용하며 이 서비스가 쓰는 테이블 3개로만 권한을 좁힘 (admin/root 미사용)
 - **TODO(운영 전 필수)**: RDS 보안 그룹이 현재 `0.0.0.0/0`으로 열려 있음 — 위 "기술 스택" 섹션의 경고 참고, EC2/특정 IP로 제한할 것

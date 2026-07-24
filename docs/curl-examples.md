@@ -1,6 +1,6 @@
 # API curl 테스트 예시
 
-`BASE`는 로컬 실행 시 `http://localhost:3000` (또는 실행 시 설정한 `PORT`), 배포 후에는 `https://qr.yaksok.kr` 로 바꿔서 사용하세요.
+`BASE`는 로컬 실행 시 `http://localhost:3000` (또는 실행 시 설정한 `PORT`), 배포 후에는 `https://yaksok-qr.onrender.com` 로 바꿔서 사용하세요.
 
 등록/폐기(`POST`, `DELETE /api/prescriptions*`)는 발급자 전용 API라 `X-API-Key` 헤더가 필요합니다. 세션 발급/조회(`/api/prescription-qr/*`)는 앱이 호출하는 공개 엔드포인트라 키가 필요 없습니다.
 
@@ -115,6 +115,14 @@ curl -sS -X POST "$BASE/api/prescriptions" \
   -H "Content-Type: application/json" -H "X-API-Key: $ADMIN_API_KEY" \
   -d '{"times": ["morning"], "start_date": "2026-07-24", "end_date": "2026-07-30"}'
 ```
+
+## 헬스체크 (콜드 스타트 깨우기)
+
+```bash
+curl -sS "$BASE/healthz"
+```
+
+`{"status":"ok"}` (200)이면 정상. Render 무료 티어에서 서비스가 잠들어 있었다면 응답까지 50초 이상 걸릴 수 있습니다.
 
 ## .well-known 앱 연동 파일 Content-Type 확인
 
