@@ -3,3 +3,4 @@ node_modules/
 *.log
 *.sql.gz
 .claude/
+legacy_yaksok_qr_backup_*.sql 
