@@ -3,9 +3,9 @@
     "relation": ["delegate_permission/common.handle_all_urls"],
     "target": {
       "namespace": "android_app",
-      "package_name": "REPLACE_WITH_ANDROID_PACKAGE_NAME",
+      "package_name": "com.yaksok.yaksok",
       "sha256_cert_fingerprints": [
-        "REPLACE:WITH:APP:SIGNING:CERT:SHA256:FINGERPRINT"
+        "C5:E2:40:45:8C:1C:93:B9:77:78:26:2F:80:32:89:D6:1E:4B:17:19:D3:E6:03:A0:89:79:11:A0:B5:CA:10:F2"
       ]
     }
   }

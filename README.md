@@ -158,9 +158,18 @@ sudo certbot --nginx -d your-domain
 
 ### 3-3. 앱 연동 파일 채우기
 
-`public/.well-known/assetlinks.json`, `public/.well-known/apple-app-site-association`은 플레이스홀더 상태입니다. 앱 팀에게서 아래 값을 받아 채워주세요.
+**Android(`assetlinks.json`)는 디버그 키스토어 지문으로 채워진 상태**입니다 (`package_name: com.yaksok.yaksok`). `sha256_cert_fingerprints`는 배열이며, **릴리스 키스토어 지문을 받으면 기존 디버그 지문을 지우지 말고 배열에 추가**하세요 (JSON은 주석을 못 넣으니 이 규칙을 여기 README에 남겨둡니다). 디버그/릴리스 지문이 배열에 같이 있어도 문제없습니다 — Android는 서명이 일치하는 항목이 하나라도 있으면 검증을 통과시킵니다.
 
-- Android: 패키지명, 서명 인증서 SHA-256 지문
+```json
+"sha256_cert_fingerprints": [
+  "C5:E2:40:45:8C:1C:93:B9:77:78:26:2F:80:32:89:D6:1E:4B:17:19:D3:E6:03:A0:89:79:11:A0:B5:CA:10:F2",
+  "여기에 릴리스 지문 추가"
+]
+```
+
+**iOS(`apple-app-site-association`)는 아직 플레이스홀더**입니다 (Team ID / Bundle ID 미수령). 앱 팀에게서 받아 채워주세요.
+
+- Android: 릴리스 키스토어 SHA-256 서명 지문 (받는 대로 위 배열에 추가)
 - iOS: Team ID + Bundle ID (`TEAMID.com.example.bundleid` 형식)
 
 두 파일 모두 `src/app.js`에서 확장자 유무와 무관하게 `Content-Type: application/json`으로 명시 응답하며, `Cache-Control: no-store` 미들웨어보다 앞에 위치해 캐싱이 허용됩니다. 배포 후 확인:
