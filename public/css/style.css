@@ -1,0 +1,218 @@
+:root {
+  color-scheme: light;
+  --bg: #f5f7fa;
+  --card: #ffffff;
+  --border: #e2e5ea;
+  --text: #1f2933;
+  --muted: #667085;
+  --primary: #2f6fed;
+  --primary-dark: #1f4fbf;
+  --danger: #d64545;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.page {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 32px 20px 64px;
+}
+
+h1 {
+  font-size: 22px;
+  margin-bottom: 4px;
+}
+
+.subtitle {
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 20px;
+}
+
+label {
+  display: block;
+  font-weight: 600;
+  font-size: 14px;
+  margin: 16px 0 6px;
+}
+
+label:first-child { margin-top: 0; }
+
+input[type="text"],
+input[type="date"],
+textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+textarea { resize: vertical; min-height: 70px; }
+
+.checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400;
+  margin: 0;
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.date-row {
+  display: flex;
+  gap: 12px;
+}
+.date-row > div { flex: 1; }
+
+button {
+  margin-top: 24px;
+  width: 100%;
+  padding: 12px;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+button:hover { background: var(--primary-dark); }
+button:disabled { background: #a9b6c9; cursor: not-allowed; }
+
+.secondary-btn {
+  margin-top: 12px;
+  width: 100%;
+  padding: 10px;
+  background: transparent;
+  color: var(--primary);
+  border: 1px dashed var(--primary);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.secondary-btn:hover { background: rgba(47, 111, 237, 0.08); }
+
+.medicine-row {
+  margin: 12px 0 0;
+  padding: 16px;
+}
+.medicine-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.medicine-row-title { font-size: 14px; }
+.remove-medicine-btn {
+  margin: 0;
+  width: auto;
+  padding: 6px 10px;
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.remove-medicine-btn:hover { background: rgba(214, 69, 69, 0.08); }
+
+.field-error {
+  color: var(--danger);
+  font-size: 13px;
+  margin-top: 8px;
+  white-space: pre-line;
+}
+
+.result {
+  text-align: center;
+}
+.result img { max-width: 240px; margin: 12px auto; display: block; }
+.result .qr-url {
+  word-break: break-all;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+.result a.download {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 10px 18px;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.hidden { display: none !important; }
+
+.landing {
+  max-width: 420px;
+  margin: 60px auto;
+  padding: 32px 24px;
+  text-align: center;
+}
+.landing .brand {
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: 0.02em;
+  margin-bottom: 8px;
+}
+.landing h1 { font-size: 20px; margin-bottom: 16px; }
+.landing p { color: var(--muted); font-size: 14px; line-height: 1.6; }
+.store-links {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 24px;
+}
+.store-link {
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: var(--primary);
+  color: #fff;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #14181f;
+    --card: #1c222c;
+    --border: #2c3542;
+    --text: #e7ebf0;
+    --muted: #93a0b3;
+  }
+}
